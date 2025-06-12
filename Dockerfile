@@ -1,15 +1,20 @@
 # Build stage
-FROM node:18 AS build
+FROM node:18 AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
+
+FROM node:18 AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-# Production stage
 FROM node:18-slim AS prod
 WORKDIR /app
-COPY --from=build /app/dist ./dist
-RUN npm install -g serve
-EXPOSE 4173
-CMD ["serve", "-s", "dist", "-l", "4173"]
+ENV NODE_ENV=production
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/package.json ./package.json
+EXPOSE 3000
+CMD ["npm", "start"]

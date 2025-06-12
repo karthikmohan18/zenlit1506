@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Sonar Social Media App will be documented in this file.
+All notable changes to the Zenlit Social Media App will be documented in this file.
 
 ## [1.0.0] - 2024-01-XX
 
@@ -84,4 +84,4 @@ All notable changes to the Sonar Social Media App will be documented in this fil
 
 ---
 
-**Note**: This changelog tracks the development progress of the Sonar Social Media App. Version numbers and dates will be updated as features are completed and released.
+**Note**: This changelog tracks the development progress of the Zenlit Social Media App. Version numbers and dates will be updated as features are completed and released.
