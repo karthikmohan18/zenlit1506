@@ -1,6 +1,6 @@
 {
-  "name": "Sonar - Connect Locally",
-  "short_name": "Sonar",
+  "name": "Zenlit - Connect Locally",
+  "short_name": "Zenlit",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

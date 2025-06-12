@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { EyeIcon, EyeSlashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { PasswordResetScreen } from './PasswordResetScreen';
 
@@ -144,11 +145,16 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen bg-black overflow-y-auto">
-      <div className="min-h-screen flex items-center justify-center p-4 py-12">
+      <motion.div
+        className="min-h-screen flex items-center justify-center p-4 py-12"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
         <div className="w-full max-w-md">
           {/* Header with more space above */}
           <div className="text-center mb-8 pt-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Sonar</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Zenlit</h1>
             <p className="text-gray-400">Connect with people around you</p>
           </div>
 
@@ -159,7 +165,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                 {isLogin ? 'Welcome Back' : 'Create Account'}
               </h2>
               <p className="text-gray-400 text-center mt-2">
-                {isLogin ? 'Sign in to your account' : 'Join the Sonar community'}
+                {isLogin ? 'Sign in to your account' : 'Join the Zenlit community'}
               </p>
             </div>
 
@@ -445,7 +451,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
             </p>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

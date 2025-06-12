@@ -22,7 +22,7 @@ export const RadarUserCard: React.FC<Props> = ({ user, onMessage, onViewProfile 
 
   return (
     <>
-      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden transition-all duration-300 ease-in-out">
+      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden transition-all duration-300 ease-in-out hover:shadow-xl">
         <div className="p-4">
           {/* Top section: Photo and Name */}
           <div className="flex items-start space-x-4 mb-3">

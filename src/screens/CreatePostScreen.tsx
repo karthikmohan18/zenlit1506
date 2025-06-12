@@ -35,7 +35,7 @@ export const CreatePostScreen: React.FC = () => {
       userDpUrl: defaultCurrentUser.dpUrl,
       title: `Post by ${defaultCurrentUser.name}`,
       mediaUrl: selectedMedia || `https://picsum.photos/800/600?random=${generateId()}`,
-      caption: caption.trim() || 'New post from Sonar!',
+      caption: caption.trim() || 'New post from Zenlit!',
       timestamp: new Date().toISOString()
     };
     
