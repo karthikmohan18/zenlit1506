@@ -106,3 +106,5 @@ temp/
 
 # Local development
 .vercel
+public/sw.js
+public/workbox-*.js

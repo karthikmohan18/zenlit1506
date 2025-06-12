@@ -127,7 +127,7 @@ const messageContents = [
   'Nice to meet you!',
   'I saw we have similar interests!',
   'Have you been to any good restaurants lately?',
-  'What brings you to Sonar?',
+  'What brings you to Zenlit?',
   'Love your travel photos!',
   'Any recommendations for hiking trails?',
   'Are you going to the upcoming tech meetup?',

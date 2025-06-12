@@ -1,6 +1,6 @@
-# Contributing to Sonar Social Media App
+# Contributing to Zenlit Social Media App
 
-Thank you for your interest in contributing to Sonar! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to Zenlit! This document provides guidelines and information for contributors.
 
 ## 🚀 Getting Started
 
@@ -14,8 +14,8 @@ Thank you for your interest in contributing to Sonar! This document provides gui
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/your-username/sonar-social.git
-   cd sonar-social
+   git clone https://github.com/your-username/zenlit-social.git
+   cd zenlit-social
    ```
 3. Install dependencies:
    ```bash
@@ -264,8 +264,8 @@ If applicable, add screenshots.
 
 ## 📄 License
 
-By contributing to Sonar, you agree that your contributions will be licensed under the MIT License.
+By contributing to Zenlit, you agree that your contributions will be licensed under the MIT License.
 
 ---
 
-Thank you for contributing to Sonar! Your help makes this project better for everyone. 🚀
+Thank you for contributing to Zenlit! Your help makes this project better for everyone. 🚀
