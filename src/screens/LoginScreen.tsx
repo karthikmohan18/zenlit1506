@@ -41,6 +41,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     }));
   };
 
+  // Real Supabase OTP implementation
   const handleSendOtp = async () => {
     if (!formData.email) {
       setError('Please enter your email address first');
@@ -50,28 +51,52 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     setEmailVerification(prev => ({ ...prev, isSendingOtp: true }));
     setError(null);
     
-    // Simulate OTP sending delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setEmailVerification(prev => ({ 
-      ...prev, 
-      otpSent: true, 
-      isSendingOtp: false,
-      countdown: 60 
-    }));
-
-    // Start countdown timer
-    const timer = setInterval(() => {
-      setEmailVerification(prev => {
-        if (prev.countdown <= 1) {
-          clearInterval(timer);
-          return { ...prev, countdown: 0 };
+    try {
+      // Send real OTP via Supabase
+      const { error } = await supabase.auth.signInWithOtp({
+        email: formData.email,
+        options: {
+          shouldCreateUser: false // Only send OTP for verification, don't create user yet
         }
-        return { ...prev, countdown: prev.countdown - 1 };
       });
-    }, 1000);
+
+      if (error) {
+        throw error;
+      }
+
+      setEmailVerification(prev => ({ 
+        ...prev, 
+        otpSent: true, 
+        isSendingOtp: false,
+        countdown: 60 
+      }));
+
+      // Start countdown timer
+      const timer = setInterval(() => {
+        setEmailVerification(prev => {
+          if (prev.countdown <= 1) {
+            clearInterval(timer);
+            return { ...prev, countdown: 0 };
+          }
+          return { ...prev, countdown: prev.countdown - 1 };
+        });
+      }, 1000);
+
+    } catch (error: any) {
+      console.error('OTP send error:', error);
+      setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+      
+      if (error.message.includes('Email rate limit exceeded')) {
+        setError('Too many OTP requests. Please wait before requesting another code.');
+      } else if (error.message.includes('Signup is disabled')) {
+        setError('New account registration is currently disabled.');
+      } else {
+        setError('Failed to send verification code. Please check your email address and try again.');
+      }
+    }
   };
 
+  // Real Supabase OTP verification
   const handleVerifyOtp = async () => {
     if (!formData.otp || formData.otp.length !== 6) {
       setError('Please enter a valid 6-digit OTP');
@@ -81,15 +106,36 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     setEmailVerification(prev => ({ ...prev, isVerifying: true }));
     setError(null);
     
-    // Simulate OTP verification delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // For demo purposes, accept any 6-digit OTP
-    setEmailVerification(prev => ({ 
-      ...prev, 
-      otpVerified: true, 
-      isVerifying: false 
-    }));
+    try {
+      // Verify OTP with Supabase
+      const { error } = await supabase.auth.verifyOtp({
+        email: formData.email,
+        token: formData.otp,
+        type: 'email'
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setEmailVerification(prev => ({ 
+        ...prev, 
+        otpVerified: true, 
+        isVerifying: false 
+      }));
+
+    } catch (error: any) {
+      console.error('OTP verification error:', error);
+      setEmailVerification(prev => ({ ...prev, isVerifying: false }));
+      
+      if (error.message.includes('Token has expired')) {
+        setError('Verification code has expired. Please request a new one.');
+      } else if (error.message.includes('Invalid token')) {
+        setError('Invalid verification code. Please check and try again.');
+      } else {
+        setError('Failed to verify code. Please try again.');
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,9 +176,13 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       }
       onLogin()
     } else {
+      // For signup, since we already verified email with OTP, we can create the account
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        options: {
+          emailRedirectTo: undefined // Skip email confirmation since we already verified with OTP
+        }
       })
       if (error) {
         setIsLoading(false)
