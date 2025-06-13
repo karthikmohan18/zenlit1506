@@ -41,6 +41,10 @@ export function useProfile(userId?: string) {
           console.log('Profile not found, will be created automatically');
           setProfile(null);
           setError(null);
+        } else if (error.code === '42P01') {
+          // Table doesn't exist - this is a migration issue
+          console.error('Profiles table does not exist. Please run the database migration.');
+          setError('Database not properly configured. Please contact support.');
         } else {
           console.error('Error fetching profile:', error);
           setError(error.message);

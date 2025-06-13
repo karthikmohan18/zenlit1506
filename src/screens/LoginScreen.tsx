@@ -127,14 +127,23 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
       if (error) {
         console.error('OTP Verification Error:', error);
-        if (error.message.includes('Token has expired')) {
+        if (error.message.includes('Token has expired') || error.message.includes('otp_expired')) {
           setError('Verification code has expired. Please request a new one.');
-        } else if (error.message.includes('Invalid token')) {
+          // Reset OTP state so user can request a new one
+          setEmailVerification(prev => ({ 
+            ...prev, 
+            isVerifying: false,
+            otpSent: false,
+            countdown: 0
+          }));
+          setFormData(prev => ({ ...prev, otp: '' }));
+        } else if (error.message.includes('Invalid token') || error.message.includes('invalid')) {
           setError('Invalid verification code. Please check and try again.');
+          setEmailVerification(prev => ({ ...prev, isVerifying: false }));
         } else {
           setError('Verification failed. Please try again.');
+          setEmailVerification(prev => ({ ...prev, isVerifying: false }));
         }
-        setEmailVerification(prev => ({ ...prev, isVerifying: false }));
         return;
       }
 
@@ -459,7 +468,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Enter the 6-digit code sent to your email
+                      Enter the 6-digit code sent to your email. Code expires in 5 minutes.
                     </p>
                   </div>
                 )}
