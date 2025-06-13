@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { PasswordResetScreen } from './PasswordResetScreen';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -18,10 +18,18 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     confirmPassword: '',
     firstName: '',
     lastName: '',
-    dateOfBirth: ''
+    dateOfBirth: '',
+    otp: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailVerification, setEmailVerification] = useState({
+    otpSent: false,
+    otpVerified: false,
+    isVerifying: false,
+    isSendingOtp: false,
+    countdown: 0
+  });
 
   const handleInputChange = (field: string, value: string) => {
     // Clear error when user starts typing
@@ -33,17 +41,69 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     }));
   };
 
+  const handleSendOtp = async () => {
+    if (!formData.email) {
+      setError('Please enter your email address first');
+      return;
+    }
+
+    setEmailVerification(prev => ({ ...prev, isSendingOtp: true }));
+    setError(null);
+    
+    // Simulate OTP sending delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    setEmailVerification(prev => ({ 
+      ...prev, 
+      otpSent: true, 
+      isSendingOtp: false,
+      countdown: 60 
+    }));
+
+    // Start countdown timer
+    const timer = setInterval(() => {
+      setEmailVerification(prev => {
+        if (prev.countdown <= 1) {
+          clearInterval(timer);
+          return { ...prev, countdown: 0 };
+        }
+        return { ...prev, countdown: prev.countdown - 1 };
+      });
+    }, 1000);
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!formData.otp || formData.otp.length !== 6) {
+      setError('Please enter a valid 6-digit OTP');
+      return;
+    }
+
+    setEmailVerification(prev => ({ ...prev, isVerifying: true }));
+    setError(null);
+    
+    // Simulate OTP verification delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // For demo purposes, accept any 6-digit OTP
+    setEmailVerification(prev => ({ 
+      ...prev, 
+      otpVerified: true, 
+      isVerifying: false 
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!isLogin && formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+    // For signup, require email verification
+    if (!isLogin && !emailVerification.otpVerified) {
+      setError('Please verify your email address first');
       return;
     }
 
-    if (!isLogin && formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (!isLogin && formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
       return;
     }
 
@@ -70,17 +130,9 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       }
       onLogin()
     } else {
-      // For signup, use traditional email/password signup
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            date_of_birth: formData.dateOfBirth
-          }
-        }
+        password: formData.password
       })
       if (error) {
         setIsLoading(false)
@@ -88,35 +140,22 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
           setError('An account with this email already exists. Please sign in instead.');
         } else if (error.message.includes('Password should be at least')) {
           setError('Password must be at least 6 characters long.');
-        } else if (error.message.includes('Signup is disabled')) {
-          setError('New account registration is currently disabled. Please contact support.');
         } else {
           setError(error.message);
         }
         return
       }
 
-      // Create user profile if signup was successful
-      if (data.user) {
-        const fullName = `${formData.firstName} ${formData.lastName}`.trim()
-        const { error: profileError } = await supabase.from('profiles').insert({
-          id: data.user.id,
-          name: fullName,
-          email: formData.email
-        })
-        
-        if (profileError) {
-          console.warn('Profile creation failed:', profileError);
-          // Don't block login if profile creation fails
-        }
-      }
-
+      const fullName = `${formData.firstName} ${formData.lastName}`.trim()
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: data.user?.id,
+        name: fullName,
+        email: formData.email
+      })
       setIsLoading(false)
-      
-      // Check if email confirmation is required
-      if (data.user && !data.session) {
-        setError('Please check your email and click the confirmation link to complete your registration.');
-        return;
+      if (profileError) {
+        setError('Account created but profile setup failed. Please try signing in.');
+        return
       }
 
       onLogin()
@@ -132,7 +171,15 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       confirmPassword: '',
       firstName: '',
       lastName: '',
-      dateOfBirth: ''
+      dateOfBirth: '',
+      otp: ''
+    });
+    setEmailVerification({
+      otpSent: false,
+      otpVerified: false,
+      isVerifying: false,
+      isSendingOtp: false,
+      countdown: 0
     });
   };
 
@@ -148,6 +195,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
   if (currentView === 'passwordReset') {
     return <PasswordResetScreen onBack={handleBackFromPasswordReset} />;
   }
+
+  const canProceedToPassword = isLogin || emailVerification.otpVerified;
 
   return (
     <div className="min-h-screen bg-black overflow-y-auto">
@@ -240,55 +289,136 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                 </div>
               )}
 
-              {/* Email */}
+              {/* Email with OTP verification */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Email Address
+                  {!isLogin && emailVerification.otpVerified && (
+                    <CheckCircleIcon className="inline w-4 h-4 text-green-500 ml-2" />
+                  )}
                 </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Password
-                </label>
-                <div className="relative">
+                <div className="flex gap-2">
                   <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-12"
-                    placeholder="Enter your password"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter your email"
                     required
-                    minLength={6}
+                    disabled={!isLogin && emailVerification.otpVerified}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-                  >
-                    {showPassword ? (
-                      <EyeSlashIcon className="w-5 h-5" />
-                    ) : (
-                      <EyeIcon className="w-5 h-5" />
-                    )}
-                  </button>
+                  {!isLogin && !emailVerification.otpVerified && (
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={emailVerification.isSendingOtp || emailVerification.countdown > 0}
+                      className="px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 active:scale-95 transition-all disabled:bg-gray-600 disabled:cursor-not-allowed whitespace-nowrap text-sm"
+                    >
+                      {emailVerification.isSendingOtp ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Sending...
+                        </div>
+                      ) : emailVerification.countdown > 0 ? (
+                        `Resend (${emailVerification.countdown}s)`
+                      ) : emailVerification.otpSent ? (
+                        'Resend OTP'
+                      ) : (
+                        'Get OTP'
+                      )}
+                    </button>
+                  )}
                 </div>
-                {!isLogin && (
-                  <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters</p>
-                )}
               </div>
 
-              {/* Confirm Password for signup */}
-              {!isLogin && (
+              {/* OTP Input (only show for signup after OTP is sent) */}
+              {!isLogin && emailVerification.otpSent && !emailVerification.otpVerified && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Enter OTP
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formData.otp}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        handleInputChange('otp', value);
+                      }}
+                      className="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center tracking-widest"
+                      placeholder="000000"
+                      maxLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyOtp}
+                      disabled={emailVerification.isVerifying || formData.otp.length !== 6}
+                      className="px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 active:scale-95 transition-all disabled:bg-gray-600 disabled:cursor-not-allowed whitespace-nowrap text-sm"
+                    >
+                      {emailVerification.isVerifying ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Verifying...
+                        </div>
+                      ) : (
+                        'Verify OTP'
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the 6-digit code sent to your email
+                  </p>
+                </div>
+              )}
+
+              {/* Email Verified Message */}
+              {!isLogin && emailVerification.otpVerified && (
+                <div className="bg-green-900/30 border border-green-700 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                    <span className="text-green-400 text-sm font-medium">
+                      Email verified successfully!
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Password (only show after email verification for signup) */}
+              {canProceedToPassword && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password}
+                      onChange={(e) => handleInputChange('password', e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-12"
+                      placeholder="Enter your password"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                    >
+                      {showPassword ? (
+                        <EyeSlashIcon className="w-5 h-5" />
+                      ) : (
+                        <EyeIcon className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                  {!isLogin && (
+                    <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters</p>
+                  )}
+                </div>
+              )}
+
+              {/* Confirm Password for signup (only show after email verification) */}
+              {!isLogin && canProceedToPassword && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Confirm Password
@@ -321,7 +451,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || (!isLogin && !emailVerification.otpVerified)}
                 className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 active:scale-95 transition-all disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isLoading ? (
