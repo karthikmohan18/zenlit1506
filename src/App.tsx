@@ -23,7 +23,7 @@ export default function App() {
   const [isClient, setIsClient] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const session = useSupabaseSession();
-  const { profile, loading: profileLoading } = useProfile(session?.user?.id);
+  const { profile, loading: profileLoading, error: profileError } = useProfile(session?.user?.id);
 
   // Ensure we're on the client side before rendering
   useEffect(() => {
@@ -32,16 +32,28 @@ export default function App() {
 
   useEffect(() => {
     const checkAuthState = async () => {
-      if (session) {
+      console.log('Checking auth state...');
+      
+      if (session?.user) {
         console.log('Session found:', session.user.id);
         setIsLoggedIn(true);
         
-        // Check if profile setup is needed
-        if (!profileLoading && profile) {
-          console.log('Profile loaded:', profile);
-          if (profile.is_profile_complete) {
+        // Wait for profile to load
+        if (!profileLoading) {
+          if (profileError) {
+            console.error('Profile error:', profileError);
+            // Even with profile error, allow user to continue
             setCurrentScreen('app');
+          } else if (profile) {
+            console.log('Profile loaded:', profile);
+            if (profile.is_profile_complete) {
+              setCurrentScreen('app');
+            } else {
+              setCurrentScreen('profileSetup');
+            }
           } else {
+            // No profile found, go to setup
+            console.log('No profile found, going to setup');
             setCurrentScreen('profileSetup');
           }
         }
@@ -49,6 +61,9 @@ export default function App() {
         console.log('No session found');
         setIsLoggedIn(false);
         setCurrentScreen('welcome');
+        setActiveTab('radar');
+        setSelectedUser(null);
+        setSelectedChatUser(null);
       }
       setAuthChecked(true);
     };
@@ -56,7 +71,7 @@ export default function App() {
     if (isClient) {
       checkAuthState();
     }
-  }, [session, profile, profileLoading, isClient]);
+  }, [session, profile, profileLoading, profileError, isClient]);
 
   // Don't render anything until we're on the client and auth is checked
   if (!isClient || !authChecked) {
@@ -70,7 +85,7 @@ export default function App() {
     );
   }
 
-  // Show loading while checking profile
+  // Show loading while checking profile (only if we have a session)
   if (session && profileLoading) {
     return (
       <div className="mobile-container bg-black flex items-center justify-center">
@@ -100,12 +115,14 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setIsLoggedIn(false);
-    setCurrentScreen('welcome');
-    setActiveTab('radar');
-    setSelectedUser(null);
-    setSelectedChatUser(null);
+    console.log('Logging out...');
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Logout error:', error);
+    } else {
+      console.log('Logged out successfully');
+    }
+    // State will be updated by the session change
   };
 
   const handleMessageUser = (user: User) => {

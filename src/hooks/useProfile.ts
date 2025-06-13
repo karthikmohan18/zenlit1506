@@ -10,6 +10,7 @@ export function useProfile(userId?: string) {
   useEffect(() => {
     if (!userId) {
       setLoading(false);
+      setProfile(null);
       return;
     }
 
@@ -17,9 +18,16 @@ export function useProfile(userId?: string) {
   }, [userId]);
 
   const fetchProfile = async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
+
+      console.log('Fetching profile for user:', userId);
 
       const { data, error } = await supabase
         .from('profiles')
@@ -28,11 +36,19 @@ export function useProfile(userId?: string) {
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error);
-        setError(error.message);
+        // If profile doesn't exist, that's okay - we'll create one
+        if (error.code === 'PGRST116') {
+          console.log('Profile not found, will be created automatically');
+          setProfile(null);
+          setError(null);
+        } else {
+          console.error('Error fetching profile:', error);
+          setError(error.message);
+        }
         return;
       }
 
+      console.log('Profile fetched successfully:', data);
       setProfile(data);
     } catch (err) {
       console.error('Profile fetch error:', err);
@@ -48,6 +64,8 @@ export function useProfile(userId?: string) {
     try {
       setError(null);
 
+      console.log('Updating profile:', updates);
+
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
@@ -61,6 +79,7 @@ export function useProfile(userId?: string) {
         return { error: error.message };
       }
 
+      console.log('Profile updated successfully:', data);
       setProfile(data);
       return { data };
     } catch (err) {
@@ -76,6 +95,8 @@ export function useProfile(userId?: string) {
 
     try {
       setError(null);
+
+      console.log('Uploading avatar for user:', userId);
 
       // Upload file to Supabase Storage
       const fileExt = file.name.split('.').pop();
@@ -97,6 +118,8 @@ export function useProfile(userId?: string) {
         .from('profiles')
         .getPublicUrl(filePath);
 
+      console.log('Avatar uploaded, public URL:', publicUrl);
+
       // Update profile with new avatar URL
       const { data, error } = await supabase
         .from('profiles')
@@ -111,6 +134,7 @@ export function useProfile(userId?: string) {
         return { error: error.message };
       }
 
+      console.log('Profile updated with avatar:', data);
       setProfile(data);
       return { data: publicUrl };
     } catch (err) {
