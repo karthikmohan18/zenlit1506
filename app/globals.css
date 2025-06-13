@@ -154,3 +154,18 @@ p, span, .message-content {
     font-size: 16px !important;
   }
 }
+
+/* Login screen specific mobile fixes */
+.login-container {
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Ensure proper viewport on mobile browsers */
+@supports (-webkit-touch-callout: none) {
+  .login-container {
+    height: -webkit-fill-available;
+  }
+}

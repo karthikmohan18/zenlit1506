@@ -61,11 +61,26 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     try {
       console.log('Sending OTP to:', formData.email);
       
-      // For demo purposes, simulate OTP sending
-      // In production, you'd integrate with an email service like SendGrid, Mailgun, etc.
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Use Supabase OTP for email verification
+      const { error } = await supabase.auth.signInWithOtp({
+        email: formData.email.trim().toLowerCase(),
+        options: {
+          shouldCreateUser: false // Only send OTP for verification, don't create user yet
+        }
+      });
+
+      if (error) {
+        console.error('OTP sending error:', error);
+        if (error.message.includes('Signups not allowed')) {
+          setError('Email verification is currently disabled. Please contact support.');
+        } else {
+          setError('Failed to send verification code. Please try again.');
+        }
+        setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+        return;
+      }
       
-      console.log('OTP sent successfully (demo mode)');
+      console.log('OTP sent successfully');
       setEmailVerification(prev => ({ 
         ...prev, 
         otpSent: true, 
@@ -103,23 +118,34 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     try {
       console.log('Verifying OTP:', formData.otp, 'for email:', formData.email);
       
-      // For demo purposes, accept specific OTP codes or any 6-digit code
-      // In production, you'd verify against your email service
-      const validOtpCodes = ['123456', '000000', formData.otp]; // Accept any OTP for demo
-      
-      if (validOtpCodes.includes(formData.otp)) {
-        console.log('OTP verified successfully (demo mode)');
-        
-        // Mark email as verified
-        setEmailVerification(prev => ({ 
-          ...prev, 
-          otpVerified: true, 
-          isVerifying: false 
-        }));
-      } else {
-        setError('Invalid verification code. For demo, try 123456 or any 6-digit code.');
+      // Verify OTP with Supabase
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: formData.email.trim().toLowerCase(),
+        token: formData.otp,
+        type: 'email'
+      });
+
+      if (error) {
+        console.error('OTP Verification Error:', error);
+        if (error.message.includes('Token has expired')) {
+          setError('Verification code has expired. Please request a new one.');
+        } else if (error.message.includes('Invalid token')) {
+          setError('Invalid verification code. Please check and try again.');
+        } else {
+          setError('Verification failed. Please try again.');
+        }
         setEmailVerification(prev => ({ ...prev, isVerifying: false }));
+        return;
       }
+
+      console.log('OTP verified successfully');
+      
+      // Mark email as verified
+      setEmailVerification(prev => ({ 
+        ...prev, 
+        otpVerified: true, 
+        isVerifying: false 
+      }));
 
     } catch (err) {
       console.error('OTP Verification Error:', err);
@@ -265,17 +291,17 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
   const canProceedToPassword = isLogin || emailVerification.otpVerified;
 
   return (
-    <div className="mobile-container bg-black">
-      <div className="h-full overflow-y-auto mobile-scroll">
+    <div className="min-h-screen bg-black overflow-hidden">
+      <div className="h-screen overflow-y-auto">
         <motion.div
-          className="min-h-full flex items-center justify-center p-4 py-12"
+          className="min-h-screen flex items-center justify-center p-4 py-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
           <div className="w-full max-w-md">
-            {/* Header with more space above */}
-            <div className="text-center mb-8 pt-8 safe-area-inset-top">
+            {/* Header with proper spacing */}
+            <div className="text-center mb-6 pt-4">
               <h1 className="text-3xl font-bold text-white mb-2">Zenlit</h1>
               <p className="text-gray-400">Connect with people around you</p>
             </div>
@@ -450,20 +476,6 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                   </div>
                 )}
 
-                {/* Demo Instructions */}
-                {!isLogin && emailVerification.otpSent && !emailVerification.otpVerified && (
-                  <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3">
-                    <div className="text-xs text-blue-300">
-                      <p className="font-medium mb-1">📱 Demo Mode Instructions:</p>
-                      <p>• Use OTP code: <span className="font-mono bg-blue-800 px-1 rounded">123456</span></p>
-                      <p>• Or any 6-digit number will work</p>
-                      <p className="mt-2 text-yellow-300">
-                        💡 In production, a real OTP would be sent to your email
-                      </p>
-                    </div>
-                  </div>
-                )}
-
                 {/* Password (only show after email verification for signup) */}
                 {canProceedToPassword && (
                   <div>
@@ -572,7 +584,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
             </div>
 
             {/* Terms and Privacy */}
-            <div className="mt-6 text-center pb-8 safe-area-inset-bottom">
+            <div className="mt-6 text-center pb-4">
               <p className="text-xs text-gray-500">
                 By continuing, you agree to our{' '}
                 <button className="text-blue-400 hover:text-blue-300 transition-colors">
