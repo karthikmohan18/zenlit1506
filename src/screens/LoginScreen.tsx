@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { EyeIcon, EyeSlashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { PasswordResetScreen } from './PasswordResetScreen';
+import { supabase } from '../../lib/supabaseClient';
 
 interface Props {
   onLogin: () => void;
@@ -87,25 +88,58 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // For signup, require email verification
     if (!isLogin && !emailVerification.otpVerified) {
       alert('Please verify your email address first');
       return;
     }
-    
+
     if (!isLogin && formData.password !== formData.confirmPassword) {
       alert('Passwords do not match');
       return;
     }
 
     setIsLoading(true);
-    
-    // Simulate authentication delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsLoading(false);
-    onLogin();
+
+    if (isLogin) {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password
+      })
+      setIsLoading(false)
+      if (error) {
+        alert(error.message)
+        return
+      }
+      alert('Logged in!')
+      onLogin()
+    } else {
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password
+      })
+      if (error) {
+        setIsLoading(false)
+        alert(error.message)
+        return
+      }
+
+      const fullName = `${formData.firstName} ${formData.lastName}`.trim()
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: data.user?.id,
+        name: fullName,
+        email: formData.email
+      })
+      setIsLoading(false)
+      if (profileError) {
+        alert(profileError.message)
+        return
+      }
+
+      alert('Account created!')
+      onLogin()
+    }
   };
 
   const toggleMode = () => {
