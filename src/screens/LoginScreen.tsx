@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { EyeIcon, EyeSlashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { PasswordResetScreen } from './PasswordResetScreen';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -22,6 +22,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     otp: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [emailVerification, setEmailVerification] = useState({
     otpSent: false,
     otpVerified: false,
@@ -31,6 +32,9 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
   });
 
   const handleInputChange = (field: string, value: string) => {
+    // Clear error when user starts typing
+    if (error) setError(null);
+    
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -39,11 +43,12 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
   const handleSendOtp = async () => {
     if (!formData.email) {
-      alert('Please enter your email address first');
+      setError('Please enter your email address first');
       return;
     }
 
     setEmailVerification(prev => ({ ...prev, isSendingOtp: true }));
+    setError(null);
     
     // Simulate OTP sending delay
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -69,11 +74,12 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
   const handleVerifyOtp = async () => {
     if (!formData.otp || formData.otp.length !== 6) {
-      alert('Please enter a valid 6-digit OTP');
+      setError('Please enter a valid 6-digit OTP');
       return;
     }
 
     setEmailVerification(prev => ({ ...prev, isVerifying: true }));
+    setError(null);
     
     // Simulate OTP verification delay
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -88,15 +94,16 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     // For signup, require email verification
     if (!isLogin && !emailVerification.otpVerified) {
-      alert('Please verify your email address first');
+      setError('Please verify your email address first');
       return;
     }
 
     if (!isLogin && formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
 
@@ -109,10 +116,18 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       })
       setIsLoading(false)
       if (error) {
-        alert(error.message)
+        // Provide more user-friendly error messages
+        if (error.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please check your credentials and try again.');
+        } else if (error.message.includes('Email not confirmed')) {
+          setError('Please check your email and click the confirmation link before signing in.');
+        } else if (error.message.includes('Too many requests')) {
+          setError('Too many login attempts. Please wait a few minutes before trying again.');
+        } else {
+          setError(error.message);
+        }
         return
       }
-      alert('Logged in!')
       onLogin()
     } else {
       const { data, error } = await supabase.auth.signUp({
@@ -121,7 +136,13 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       })
       if (error) {
         setIsLoading(false)
-        alert(error.message)
+        if (error.message.includes('User already registered')) {
+          setError('An account with this email already exists. Please sign in instead.');
+        } else if (error.message.includes('Password should be at least')) {
+          setError('Password must be at least 6 characters long.');
+        } else {
+          setError(error.message);
+        }
         return
       }
 
@@ -133,17 +154,17 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       })
       setIsLoading(false)
       if (profileError) {
-        alert(profileError.message)
+        setError('Account created but profile setup failed. Please try signing in.');
         return
       }
 
-      alert('Account created!')
       onLogin()
     }
   };
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
+    setError(null);
     setFormData({
       email: '',
       password: '',
@@ -202,6 +223,20 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                 {isLogin ? 'Sign in to your account' : 'Join the Zenlit community'}
               </p>
             </div>
+
+            {/* Error Message */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 bg-red-900/30 border border-red-700 rounded-lg p-3"
+              >
+                <div className="flex items-center gap-2">
+                  <ExclamationTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
+                  <span className="text-red-400 text-sm">{error}</span>
+                </div>
+              </motion.div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Name fields for signup - side by side */}
