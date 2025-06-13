@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -9,6 +9,7 @@ import { CreatePostScreen } from './screens/CreatePostScreen';
 import { MessagesScreen } from './screens/MessagesScreen';
 import { UserGroupIcon, Squares2X2Icon, UserIcon, PlusIcon, ChatBubbleLeftIcon } from '@heroicons/react/24/outline';
 import { User } from './types';
+import { supabase, useSupabaseSession } from '../lib/supabaseClient';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'welcome' | 'login' | 'app'>('welcome');
@@ -17,6 +18,14 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('radar'); // Changed default to radar
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedChatUser, setSelectedChatUser] = useState<User | null>(null);
+  const session = useSupabaseSession();
+
+  useEffect(() => {
+    if (session) {
+      setIsLoggedIn(true);
+      setCurrentScreen('app');
+    }
+  }, [session]);
 
   const handleGetStarted = () => {
     setCurrentScreen('login');
@@ -27,7 +36,8 @@ export default function App() {
     setCurrentScreen('app');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setIsLoggedIn(false);
     setCurrentScreen('welcome');
     setActiveTab('radar'); // Changed default to radar
