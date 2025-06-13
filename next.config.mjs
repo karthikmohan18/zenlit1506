@@ -9,9 +9,13 @@ const withPWA = nextPwa({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false, // Disable strict mode to prevent double rendering
   experimental: {
     appDir: true,
+  },
+  // Add this to handle client-side routing properly
+  async rewrites() {
+    return []
   },
 }
 

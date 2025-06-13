@@ -15,10 +15,16 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'welcome' | 'login' | 'app'>('welcome');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userGender] = useState<'male' | 'female'>('male');
-  const [activeTab, setActiveTab] = useState('radar'); // Changed default to radar
+  const [activeTab, setActiveTab] = useState('radar');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedChatUser, setSelectedChatUser] = useState<User | null>(null);
+  const [isClient, setIsClient] = useState(false);
   const session = useSupabaseSession();
+
+  // Ensure we're on the client side before rendering
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     if (session) {
@@ -26,6 +32,11 @@ export default function App() {
       setCurrentScreen('app');
     }
   }, [session]);
+
+  // Don't render anything until we're on the client
+  if (!isClient) {
+    return null;
+  }
 
   const handleGetStarted = () => {
     setCurrentScreen('login');
@@ -40,7 +51,7 @@ export default function App() {
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setCurrentScreen('welcome');
-    setActiveTab('radar'); // Changed default to radar
+    setActiveTab('radar');
     setSelectedUser(null);
     setSelectedChatUser(null);
   };
