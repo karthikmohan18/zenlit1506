@@ -28,7 +28,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     otpVerified: false,
     isVerifying: false,
     isSendingOtp: false,
-    countdown: 0
+    countdown: 0,
+    needsEmailConfirmation: false
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -50,26 +51,43 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     setEmailVerification(prev => ({ ...prev, isSendingOtp: true }));
     setError(null);
     
-    // Simulate OTP sending delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setEmailVerification(prev => ({ 
-      ...prev, 
-      otpSent: true, 
-      isSendingOtp: false,
-      countdown: 60 
-    }));
-
-    // Start countdown timer
-    const timer = setInterval(() => {
-      setEmailVerification(prev => {
-        if (prev.countdown <= 1) {
-          clearInterval(timer);
-          return { ...prev, countdown: 0 };
+    try {
+      // Send OTP via Supabase
+      const { error } = await supabase.auth.signInWithOtp({
+        email: formData.email,
+        options: {
+          shouldCreateUser: false // Only send OTP for verification, don't create user yet
         }
-        return { ...prev, countdown: prev.countdown - 1 };
       });
-    }, 1000);
+
+      if (error) {
+        setError('Failed to send verification code. Please try again.');
+        setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+        return;
+      }
+
+      setEmailVerification(prev => ({ 
+        ...prev, 
+        otpSent: true, 
+        isSendingOtp: false,
+        countdown: 60 
+      }));
+
+      // Start countdown timer
+      const timer = setInterval(() => {
+        setEmailVerification(prev => {
+          if (prev.countdown <= 1) {
+            clearInterval(timer);
+            return { ...prev, countdown: 0 };
+          }
+          return { ...prev, countdown: prev.countdown - 1 };
+        });
+      }, 1000);
+
+    } catch (err) {
+      setError('Failed to send verification code. Please try again.');
+      setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+    }
   };
 
   const handleVerifyOtp = async () => {
@@ -81,15 +99,31 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     setEmailVerification(prev => ({ ...prev, isVerifying: true }));
     setError(null);
     
-    // Simulate OTP verification delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // For demo purposes, accept any 6-digit OTP
-    setEmailVerification(prev => ({ 
-      ...prev, 
-      otpVerified: true, 
-      isVerifying: false 
-    }));
+    try {
+      // Verify OTP with Supabase
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: formData.email,
+        token: formData.otp,
+        type: 'email'
+      });
+
+      if (error) {
+        setError('Invalid or expired verification code. Please try again.');
+        setEmailVerification(prev => ({ ...prev, isVerifying: false }));
+        return;
+      }
+
+      // OTP verified successfully
+      setEmailVerification(prev => ({ 
+        ...prev, 
+        otpVerified: true, 
+        isVerifying: false 
+      }));
+
+    } catch (err) {
+      setError('Verification failed. Please try again.');
+      setEmailVerification(prev => ({ ...prev, isVerifying: false }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,9 +164,13 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       }
       onLogin()
     } else {
+      // For signup, create user with confirmed email since we verified OTP
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        options: {
+          emailRedirectTo: undefined, // Disable email confirmation since we used OTP
+        }
       })
       if (error) {
         setIsLoading(false)
@@ -179,7 +217,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       otpVerified: false,
       isVerifying: false,
       isSendingOtp: false,
-      countdown: 0
+      countdown: 0,
+      needsEmailConfirmation: false
     });
   };
 
