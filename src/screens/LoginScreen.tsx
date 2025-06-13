@@ -48,24 +48,47 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setEmailVerification(prev => ({ ...prev, isSendingOtp: true }));
     setError(null);
     
     try {
-      // Send OTP via Supabase
-      const { error } = await supabase.auth.signInWithOtp({
+      console.log('Sending OTP to:', formData.email);
+      
+      // Send OTP via Supabase Auth - using email OTP instead of magic link
+      const { data, error } = await supabase.auth.signInWithOtp({
         email: formData.email,
         options: {
-          shouldCreateUser: false // Only send OTP for verification, don't create user yet
+          shouldCreateUser: false, // Don't create user yet, just send OTP for verification
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+          }
         }
       });
 
+      console.log('OTP Response:', { data, error });
+
       if (error) {
-        setError('Failed to send verification code. Please try again.');
+        console.error('OTP Error:', error);
+        if (error.message.includes('rate limit')) {
+          setError('Too many requests. Please wait a few minutes before requesting another code.');
+        } else if (error.message.includes('invalid email')) {
+          setError('Please enter a valid email address.');
+        } else {
+          setError(`Failed to send verification code: ${error.message}`);
+        }
         setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
         return;
       }
 
+      console.log('OTP sent successfully');
       setEmailVerification(prev => ({ 
         ...prev, 
         otpSent: true, 
@@ -85,7 +108,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       }, 1000);
 
     } catch (err) {
-      setError('Failed to send verification code. Please try again.');
+      console.error('OTP Send Error:', err);
+      setError('Failed to send verification code. Please check your internet connection and try again.');
       setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
     }
   };
@@ -100,6 +124,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     setError(null);
     
     try {
+      console.log('Verifying OTP:', formData.otp, 'for email:', formData.email);
+      
       // Verify OTP with Supabase
       const { data, error } = await supabase.auth.verifyOtp({
         email: formData.email,
@@ -107,20 +133,34 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
         type: 'email'
       });
 
+      console.log('OTP Verification Response:', { data, error });
+
       if (error) {
-        setError('Invalid or expired verification code. Please try again.');
+        console.error('OTP Verification Error:', error);
+        if (error.message.includes('expired')) {
+          setError('Verification code has expired. Please request a new one.');
+        } else if (error.message.includes('invalid')) {
+          setError('Invalid verification code. Please check and try again.');
+        } else {
+          setError(`Verification failed: ${error.message}`);
+        }
         setEmailVerification(prev => ({ ...prev, isVerifying: false }));
         return;
       }
 
-      // OTP verified successfully
+      console.log('OTP verified successfully');
+      // OTP verified successfully - this means email is valid
       setEmailVerification(prev => ({ 
         ...prev, 
         otpVerified: true, 
         isVerifying: false 
       }));
 
+      // Sign out the temporary session created by OTP verification
+      await supabase.auth.signOut();
+
     } catch (err) {
+      console.error('OTP Verification Error:', err);
       setError('Verification failed. Please try again.');
       setEmailVerification(prev => ({ ...prev, isVerifying: false }));
     }
@@ -164,12 +204,16 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       }
       onLogin()
     } else {
-      // For signup, create user with confirmed email since we verified OTP
+      // For signup, create user with email and password (email already verified via OTP)
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: undefined, // Disable email confirmation since we used OTP
+          emailRedirectTo: undefined, // Don't send confirmation email since we already verified via OTP
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+          }
         }
       })
       if (error) {
@@ -184,11 +228,14 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
         return
       }
 
+      // Create profile entry
       const fullName = `${formData.firstName} ${formData.lastName}`.trim()
       const { error: profileError } = await supabase.from('profiles').insert({
         id: data.user?.id,
-        name: fullName,
-        email: formData.email
+        email: formData.email,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        display_name: fullName
       })
       setIsLoading(false)
       if (profileError) {
@@ -418,6 +465,25 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                     <span className="text-green-400 text-sm font-medium">
                       Email verified successfully!
                     </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Debug Info */}
+              {!isLogin && emailVerification.otpSent && (
+                <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3">
+                  <div className="text-xs text-blue-300">
+                    <p>📧 OTP sent to: {formData.email}</p>
+                    <p>📱 Check your email inbox (and spam folder)</p>
+                    <p>⏰ Code expires in 60 minutes</p>
+                    <p className="mt-2 text-yellow-300">
+                      💡 The OTP is sent directly to your email - no redirect links needed!
+                    </p>
+                    {process.env.NODE_ENV === 'development' && (
+                      <p className="mt-2 text-yellow-300">
+                        🔧 Dev mode: Check browser console for debug info
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
