@@ -23,13 +23,13 @@ export const ChatList = ({
 
   return (
     <div className="flex flex-col h-full bg-black">
-      {/* Header with native dark colors */}
-      <div className="px-4 py-3 bg-black border-b border-gray-800">
+      {/* Header */}
+      <div className="flex-shrink-0 px-4 py-3 bg-black border-b border-gray-800 safe-area-inset-top">
         <h2 className="text-xl font-bold text-white">Messages</h2>
       </div>
       
       {/* Chat List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto mobile-scroll">
         {users.map((user) => {
           const latestMessage = getLatestMessage(user.id);
 

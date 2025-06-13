@@ -312,49 +312,51 @@ export const PasswordResetScreen: React.FC<Props> = ({ onBack }) => {
   );
 
   return (
-    <div className="min-h-screen bg-black overflow-y-auto">
-      <div className="min-h-screen flex items-center justify-center p-4 py-12">
-        <div className="w-full max-w-md">
-          {/* Header */}
-          <div className="flex items-center mb-8">
-            <button
-              onClick={onBack}
-              className="mr-4 p-2 rounded-full hover:bg-gray-800 active:scale-95 transition-all"
-            >
-              <ChevronLeftIcon className="w-5 h-5 text-white" />
-            </button>
-            <div className="flex items-center">
-              <img
-                src="https://media.istockphoto.com/id/696912200/vector/radar-scan-or-sonar-communicating-with-transmission-waves-back-and-forth.jpg?s=612x612&w=0&k=20&c=MEM4t0wmdLhl88KW-73N0-4V1KT4CmVgUwJIA52F6-U="
-                alt="Zenlit"
-                className="w-8 h-8 object-contain rounded mr-3"
-              />
-              <h1 className="text-xl font-bold text-white">Zenlit</h1>
+    <div className="mobile-container bg-black">
+      <div className="h-full overflow-y-auto mobile-scroll">
+        <div className="min-h-full flex items-center justify-center p-4 py-12">
+          <div className="w-full max-w-md">
+            {/* Header */}
+            <div className="flex items-center mb-8 safe-area-inset-top">
+              <button
+                onClick={onBack}
+                className="mr-4 p-2 rounded-full hover:bg-gray-800 active:scale-95 transition-all"
+              >
+                <ChevronLeftIcon className="w-5 h-5 text-white" />
+              </button>
+              <div className="flex items-center">
+                <img
+                  src="https://media.istockphoto.com/id/696912200/vector/radar-scan-or-sonar-communicating-with-transmission-waves-back-and-forth.jpg?s=612x612&w=0&k=20&c=MEM4t0wmdLhl88KW-73N0-4V1KT4CmVgUwJIA52F6-U="
+                  alt="Zenlit"
+                  className="w-8 h-8 object-contain rounded mr-3"
+                />
+                <h1 className="text-xl font-bold text-white">Zenlit</h1>
+              </div>
             </div>
-          </div>
 
-          {/* Form Container */}
-          <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
-            {step === 'email' && renderEmailStep()}
-            {step === 'otp' && renderOtpStep()}
-            {step === 'newPassword' && renderNewPasswordStep()}
-            {step === 'success' && renderSuccessStep()}
-          </div>
-
-          {/* Help Text */}
-          {step !== 'success' && (
-            <div className="mt-6 text-center">
-              <p className="text-xs text-gray-500">
-                Remember your password?{' '}
-                <button
-                  onClick={onBack}
-                  className="text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                  Back to Sign In
-                </button>
-              </p>
+            {/* Form Container */}
+            <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
+              {step === 'email' && renderEmailStep()}
+              {step === 'otp' && renderOtpStep()}
+              {step === 'newPassword' && renderNewPasswordStep()}
+              {step === 'success' && renderSuccessStep()}
             </div>
-          )}
+
+            {/* Help Text */}
+            {step !== 'success' && (
+              <div className="mt-6 text-center pb-8 safe-area-inset-bottom">
+                <p className="text-xs text-gray-500">
+                  Remember your password?{' '}
+                  <button
+                    onClick={onBack}
+                    className="text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    Back to Sign In
+                  </button>
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

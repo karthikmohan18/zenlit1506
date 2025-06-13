@@ -77,12 +77,12 @@ export const MessagesScreen: React.FC<Props> = ({
   const selectedUserMessages = selectedUser ? getMessagesForUser(selectedUser.id) : [];
 
   return (
-    <div className="h-full bg-black flex">
+    <div className="h-full bg-black flex flex-col">
       {/* Mobile: Show either chat list or chat window */}
       {isMobile ? (
         <>
           {!selectedUser ? (
-            <div className="w-full">
+            <div className="flex-1 flex flex-col">
               <ChatList
                 users={allUsers}
                 messages={allMessages}
@@ -91,7 +91,7 @@ export const MessagesScreen: React.FC<Props> = ({
               />
             </div>
           ) : (
-            <div className="w-full">
+            <div className="flex-1 flex flex-col">
               <ChatWindow
                 user={selectedUser}
                 messages={selectedUserMessages}
@@ -106,7 +106,7 @@ export const MessagesScreen: React.FC<Props> = ({
       ) : (
         /* Desktop: Show both panels */
         <>
-          <div className="w-80 border-r border-gray-800">
+          <div className="w-80 border-r border-gray-800 flex-shrink-0">
             <ChatList
               users={allUsers}
               messages={allMessages}
@@ -114,7 +114,7 @@ export const MessagesScreen: React.FC<Props> = ({
               onSelectUser={handleSelectUser}
             />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 flex flex-col">
             {selectedUser ? (
               <ChatWindow
                 user={selectedUser}

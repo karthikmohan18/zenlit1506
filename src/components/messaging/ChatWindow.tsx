@@ -40,7 +40,7 @@ export const ChatWindow = ({
   return (
     <div className="h-full flex flex-col bg-black">
       {/* Pinned Chat Header with Back Button */}
-      <div className="sticky top-0 z-10 bg-black/90 backdrop-blur-sm border-b border-gray-800">
+      <div className="flex-shrink-0 bg-black/90 backdrop-blur-sm border-b border-gray-800 safe-area-inset-top">
         <div className="flex items-center px-4 py-3">
           {onBack && (
             <button
@@ -70,7 +70,7 @@ export const ChatWindow = ({
       </div>
 
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto mobile-scroll p-4 space-y-4">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -97,7 +97,7 @@ export const ChatWindow = ({
       </div>
 
       {/* Message Input */}
-      <div className="border-t border-gray-800 p-4">
+      <div className="flex-shrink-0 border-t border-gray-800 p-4 safe-area-inset-bottom">
         <MessageInput onSendMessage={onSendMessage} />
       </div>
     </div>
