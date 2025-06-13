@@ -1,24 +1,55 @@
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, Profile } from '../types';
 import { defaultCurrentUser, getCurrentUserPosts } from '../data/mockData';
 import { IconBrandInstagram, IconBrandLinkedin, IconBrandX } from '@tabler/icons-react';
 import { ChevronLeftIcon, Cog6ToothIcon, UserIcon, ArrowRightOnRectangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { PostsGalleryScreen } from './PostsGalleryScreen';
 import { EditProfileScreen } from './EditProfileScreen';
+import { useSupabaseSession } from '../../lib/supabaseClient';
 
 interface Props {
   user?: User | null;
   onBack?: () => void;
   onLogout?: () => void;
   onNavigateToCreate?: () => void;
+  currentUserProfile?: Profile | null;
 }
 
-export const ProfileScreen: React.FC<Props> = ({ user, onBack, onLogout, onNavigateToCreate }) => {
+export const ProfileScreen: React.FC<Props> = ({ 
+  user, 
+  onBack, 
+  onLogout, 
+  onNavigateToCreate,
+  currentUserProfile 
+}) => {
   const [showPostsGallery, setShowPostsGallery] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-  const profileData = user || defaultCurrentUser;
-  const isCurrentUser = !user || user.id === defaultCurrentUser.id;
+  const session = useSupabaseSession();
+  
+  // Determine if viewing own profile
+  const isCurrentUser = !user || (session?.user?.id && user.id === session.user.id);
+  
+  // Use current user's profile data if viewing own profile
+  const profileData = isCurrentUser && currentUserProfile 
+    ? {
+        id: currentUserProfile.id,
+        name: currentUserProfile.display_name || `${currentUserProfile.first_name} ${currentUserProfile.last_name}`.trim() || 'User',
+        dpUrl: currentUserProfile.avatar_url || defaultCurrentUser.dpUrl,
+        bio: currentUserProfile.bio || '',
+        gender: currentUserProfile.gender === 'male' || currentUserProfile.gender === 'female' ? currentUserProfile.gender : 'male',
+        age: currentUserProfile.date_of_birth 
+          ? new Date().getFullYear() - new Date(currentUserProfile.date_of_birth).getFullYear()
+          : 25,
+        distance: 0,
+        interests: currentUserProfile.interests || [],
+        links: {
+          Twitter: `https://twitter.com/${currentUserProfile.display_name?.toLowerCase().replace(/\s+/g, '') || 'user'}`,
+          Instagram: `https://instagram.com/${currentUserProfile.display_name?.toLowerCase().replace(/\s+/g, '') || 'user'}`,
+          LinkedIn: `https://linkedin.com/in/${currentUserProfile.display_name?.toLowerCase().replace(/\s+/g, '') || 'user'}`,
+        }
+      } as User
+    : user || defaultCurrentUser;
   
   // Get current user's posts if viewing own profile
   const userPosts = isCurrentUser ? getCurrentUserPosts() : [];
@@ -55,14 +86,8 @@ export const ProfileScreen: React.FC<Props> = ({ user, onBack, onLogout, onNavig
     }
   };
 
-  // Count verified social accounts
-  const verifiedAccountsCount = [
-    profileData.instagramVerified,
-    profileData.facebookVerified,
-    profileData.linkedInVerified,
-    profileData.twitterVerified,
-    profileData.googleVerified
-  ].filter(Boolean).length;
+  // Count verified social accounts (placeholder for now)
+  const verifiedAccountsCount = 0;
 
   if (showEditProfile) {
     return (
@@ -70,7 +95,7 @@ export const ProfileScreen: React.FC<Props> = ({ user, onBack, onLogout, onNavig
         user={profileData}
         onBack={handleBackFromEdit}
         onSave={(updatedUser) => {
-          // TODO: Implement save functionality
+          // TODO: Implement save functionality with Supabase
           console.log('Updated user:', updatedUser);
           setShowEditProfile(false);
         }}
@@ -95,7 +120,7 @@ export const ProfileScreen: React.FC<Props> = ({ user, onBack, onLogout, onNavig
       <div className="relative">
         <div className="h-48 bg-gradient-to-b from-blue-900 to-black">
           <img
-            src={`https://picsum.photos/800/400?random=${profileData.id}`}
+            src={currentUserProfile?.cover_url || `https://picsum.photos/800/400?random=${profileData.id}`}
             alt="Profile Cover"
             className="w-full h-full object-cover opacity-60"
           />
@@ -196,6 +221,39 @@ export const ProfileScreen: React.FC<Props> = ({ user, onBack, onLogout, onNavig
           )}
           
           <p className="text-gray-300 mt-2 text-base leading-relaxed">{profileData.bio}</p>
+          
+          {/* Location and Age */}
+          {isCurrentUser && currentUserProfile && (
+            <div className="flex justify-center gap-4 mt-4 text-sm text-gray-400">
+              {currentUserProfile.location && (
+                <span>📍 {currentUserProfile.location}</span>
+              )}
+              {currentUserProfile.date_of_birth && (
+                <span>🎂 {new Date().getFullYear() - new Date(currentUserProfile.date_of_birth).getFullYear()} years old</span>
+              )}
+            </div>
+          )}
+          
+          {/* Interests */}
+          {isCurrentUser && currentUserProfile?.interests && currentUserProfile.interests.length > 0 && (
+            <div className="mt-4">
+              <div className="flex flex-wrap justify-center gap-2">
+                {currentUserProfile.interests.slice(0, 6).map((interest) => (
+                  <span
+                    key={interest}
+                    className="px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm"
+                  >
+                    {interest}
+                  </span>
+                ))}
+                {currentUserProfile.interests.length > 6 && (
+                  <span className="px-3 py-1 bg-gray-700 text-gray-400 rounded-full text-sm">
+                    +{currentUserProfile.interests.length - 6} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           
           {/* Social Links with verification indicators */}
           <div className="flex justify-center gap-8 mt-8">

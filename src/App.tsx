@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 import { LoginScreen } from './screens/LoginScreen';
+import { ProfileSetupScreen } from './screens/ProfileSetupScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { RadarScreen } from './screens/RadarScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
@@ -10,9 +11,10 @@ import { MessagesScreen } from './screens/MessagesScreen';
 import { UserGroupIcon, Squares2X2Icon, UserIcon, PlusIcon, ChatBubbleLeftIcon } from '@heroicons/react/24/outline';
 import { User } from './types';
 import { supabase, useSupabaseSession } from '../lib/supabaseClient';
+import { useProfile } from './hooks/useProfile';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<'welcome' | 'login' | 'app'>('welcome');
+  const [currentScreen, setCurrentScreen] = useState<'welcome' | 'login' | 'profileSetup' | 'app'>('welcome');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userGender] = useState<'male' | 'female'>('male');
   const [activeTab, setActiveTab] = useState('radar');
@@ -20,6 +22,7 @@ export default function App() {
   const [selectedChatUser, setSelectedChatUser] = useState<User | null>(null);
   const [isClient, setIsClient] = useState(false);
   const session = useSupabaseSession();
+  const { profile, loading: profileLoading } = useProfile(session?.user?.id);
 
   // Ensure we're on the client side before rendering
   useEffect(() => {
@@ -29,13 +32,36 @@ export default function App() {
   useEffect(() => {
     if (session) {
       setIsLoggedIn(true);
-      setCurrentScreen('app');
+      
+      // Check if profile setup is needed
+      if (!profileLoading && profile) {
+        if (profile.is_profile_complete) {
+          setCurrentScreen('app');
+        } else {
+          setCurrentScreen('profileSetup');
+        }
+      }
+    } else {
+      setIsLoggedIn(false);
+      setCurrentScreen('welcome');
     }
-  }, [session]);
+  }, [session, profile, profileLoading]);
 
   // Don't render anything until we're on the client
   if (!isClient) {
     return null;
+  }
+
+  // Show loading while checking profile
+  if (session && profileLoading) {
+    return (
+      <div className="h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white">Loading your profile...</p>
+        </div>
+      </div>
+    );
   }
 
   const handleGetStarted = () => {
@@ -44,6 +70,14 @@ export default function App() {
 
   const handleLogin = () => {
     setIsLoggedIn(true);
+    // Screen will be set by useEffect based on profile status
+  };
+
+  const handleProfileSetupComplete = () => {
+    setCurrentScreen('app');
+  };
+
+  const handleProfileSetupSkip = () => {
     setCurrentScreen('app');
   };
 
@@ -79,7 +113,18 @@ export default function App() {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  // Show main app after login
+  // Show profile setup screen for new users
+  if (currentScreen === 'profileSetup' && session?.user?.id) {
+    return (
+      <ProfileSetupScreen
+        userId={session.user.id}
+        onComplete={handleProfileSetupComplete}
+        onSkip={handleProfileSetupSkip}
+      />
+    );
+  }
+
+  // Show main app after login and profile setup
   return (
     <div className="h-screen bg-black text-white overflow-hidden">
       {/* Mobile App Container */}
@@ -109,6 +154,7 @@ export default function App() {
               onBack={() => setSelectedUser(null)}
               onLogout={handleLogout}
               onNavigateToCreate={handleNavigateToCreate}
+              currentUserProfile={profile}
             />
           )}
         </main>

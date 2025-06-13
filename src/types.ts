@@ -27,6 +27,24 @@ export interface User {
   googleVerified?: boolean;
 }
 
+export interface Profile {
+  id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  display_name?: string;
+  bio?: string;
+  date_of_birth?: string;
+  gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  location?: string;
+  avatar_url?: string;
+  cover_url?: string;
+  interests?: string[];
+  is_profile_complete: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Post {
   id: string;
   userId: string;
