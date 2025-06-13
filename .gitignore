@@ -106,3 +106,6 @@ temp/
 
 # Local development
 .vercel
+# PWA build artifacts
+public/sw.js
+public/workbox-*.js
