@@ -61,15 +61,11 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     try {
       console.log('Sending OTP to:', formData.email);
       
-      // Send OTP via Supabase Auth - using email OTP instead of magic link
+      // Send OTP via Supabase Auth - using email OTP for verification only
       const { data, error } = await supabase.auth.signInWithOtp({
         email: formData.email,
         options: {
           shouldCreateUser: false, // Don't create user yet, just send OTP for verification
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-          }
         }
       });
 
@@ -126,7 +122,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     try {
       console.log('Verifying OTP:', formData.otp, 'for email:', formData.email);
       
-      // Verify OTP with Supabase
+      // Verify OTP with Supabase - this will create a temporary session
       const { data, error } = await supabase.auth.verifyOtp({
         email: formData.email,
         token: formData.otp,
@@ -149,15 +145,17 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       }
 
       console.log('OTP verified successfully');
-      // OTP verified successfully - this means email is valid
+      
+      // IMPORTANT: Sign out the temporary session immediately
+      // We only want to verify the email, not log the user in yet
+      await supabase.auth.signOut();
+      
+      // Mark email as verified
       setEmailVerification(prev => ({ 
         ...prev, 
         otpVerified: true, 
         isVerifying: false 
       }));
-
-      // Sign out the temporary session created by OTP verification
-      await supabase.auth.signOut();
 
     } catch (err) {
       console.error('OTP Verification Error:', err);
@@ -202,7 +200,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
         }
         return
       }
-      onLogin()
+      // Don't call onLogin() here - let the session change trigger it
+      console.log('Login successful, session will be handled by useEffect');
     } else {
       // For signup, create user with email and password (email already verified via OTP)
       const { data, error } = await supabase.auth.signUp({
@@ -216,8 +215,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
           }
         }
       })
+      setIsLoading(false)
       if (error) {
-        setIsLoading(false)
         if (error.message.includes('User already registered')) {
           setError('An account with this email already exists. Please sign in instead.');
         } else if (error.message.includes('Password should be at least')) {
@@ -228,22 +227,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
         return
       }
 
-      // Create profile entry
-      const fullName = `${formData.firstName} ${formData.lastName}`.trim()
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: data.user?.id,
-        email: formData.email,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        display_name: fullName
-      })
-      setIsLoading(false)
-      if (profileError) {
-        setError('Account created but profile setup failed. Please try signing in.');
-        return
-      }
-
-      onLogin()
+      console.log('Signup successful, session will be handled by useEffect');
+      // Don't call onLogin() here - let the session change trigger it
     }
   };
 
@@ -285,9 +270,9 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
   const canProceedToPassword = isLogin || emailVerification.otpVerified;
 
   return (
-    <div className="min-h-screen bg-black overflow-y-auto">
+    <div className="mobile-container bg-black overflow-y-auto mobile-scroll">
       <motion.div
-        className="min-h-screen flex items-center justify-center p-4 py-12"
+        className="min-h-full flex items-center justify-center p-4 py-12"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}

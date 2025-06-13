@@ -31,9 +31,9 @@ export const RadarScreen: React.FC<Props> = ({
   };
 
   return (
-    <div className="h-full bg-black overflow-y-auto">
+    <div className="h-full bg-black flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-sm border-b border-gray-800">
+      <div className="flex-shrink-0 bg-black border-b border-gray-800 safe-area-inset-top">
         <div className="px-4 py-3">
           <h1 className="text-xl font-bold text-white">Nearby People</h1>
           <p className="text-sm text-gray-400 mt-1">Discover people around you</p>
@@ -41,15 +41,17 @@ export const RadarScreen: React.FC<Props> = ({
       </div>
 
       {/* Users List */}
-      <div className="px-4 py-4 space-y-4">
-        {users.map((user) => (
-          <RadarUserCard
-            key={user.id}
-            user={user}
-            onMessage={handleMessage}
-            onViewProfile={() => handleViewProfile(user)}
-          />
-        ))}
+      <div className="flex-1 overflow-y-auto mobile-scroll">
+        <div className="px-4 py-4 space-y-4">
+          {users.map((user) => (
+            <RadarUserCard
+              key={user.id}
+              user={user}
+              onMessage={handleMessage}
+              onViewProfile={() => handleViewProfile(user)}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

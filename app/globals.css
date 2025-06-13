@@ -14,7 +14,6 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
-  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
@@ -26,12 +25,30 @@ html, body {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+  overflow: hidden;
 }
 
 #root {
   height: 100vh;
+  height: 100dvh; /* Use dynamic viewport height for mobile */
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* Mobile viewport fixes */
+@supports (-webkit-touch-callout: none) {
+  #root {
+    height: -webkit-fill-available;
+  }
+}
+
+/* Ensure proper mobile sizing */
+.mobile-container {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
   overflow: hidden;
 }
 
@@ -69,6 +86,10 @@ html, body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
 /* Line clamp utility */
 .line-clamp-2 {
   display: -webkit-box;
@@ -104,4 +125,32 @@ p, span, .message-content {
   -moz-user-select: text;
   -ms-user-select: text;
   user-select: text;
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 768px) {
+  body {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+  }
+  
+  .mobile-scroll {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: 100%;
+  }
+}
+
+/* Prevent zoom on input focus on iOS */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="date"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
