@@ -36,6 +36,8 @@ export function useProfile(userId?: string) {
         .single();
 
       if (error) {
+        console.error('Profile fetch error details:', error);
+        
         // If profile doesn't exist, that's okay - we'll create one
         if (error.code === 'PGRST116') {
           console.log('Profile not found, will be created automatically');
@@ -47,7 +49,7 @@ export function useProfile(userId?: string) {
           setError('Database not properly configured. Please contact support.');
         } else {
           console.error('Error fetching profile:', error);
-          setError(error.message);
+          setError(`Failed to load profile: ${error.message}`);
         }
         return;
       }
@@ -62,14 +64,57 @@ export function useProfile(userId?: string) {
     }
   };
 
+  const createProfile = async (profileData: Partial<Profile>) => {
+    if (!userId) return { error: 'No user ID provided' };
+
+    try {
+      setError(null);
+      console.log('Creating new profile for user:', userId, profileData);
+
+      // Get user email from auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        return { error: 'User email not found' };
+      }
+
+      const newProfile = {
+        id: userId,
+        email: user.email,
+        ...profileData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([newProfile])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating profile:', error);
+        return { error: `Failed to create profile: ${error.message}` };
+      }
+
+      console.log('Profile created successfully:', data);
+      setProfile(data);
+      return { data };
+    } catch (err) {
+      console.error('Profile creation error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create profile';
+      setError(errorMessage);
+      return { error: errorMessage };
+    }
+  };
+
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!userId) return { error: 'No user ID provided' };
 
     try {
       setError(null);
-
       console.log('Updating profile:', updates);
 
+      // First try to update
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
@@ -79,8 +124,15 @@ export function useProfile(userId?: string) {
 
       if (error) {
         console.error('Error updating profile:', error);
-        setError(error.message);
-        return { error: error.message };
+        
+        // If profile doesn't exist, create it
+        if (error.code === 'PGRST116') {
+          console.log('Profile not found, creating new profile');
+          return await createProfile(updates);
+        }
+        
+        setError(`Failed to update profile: ${error.message}`);
+        return { error: `Failed to update profile: ${error.message}` };
       }
 
       console.log('Profile updated successfully:', data);
@@ -88,7 +140,7 @@ export function useProfile(userId?: string) {
       return { data };
     } catch (err) {
       console.error('Profile update error:', err);
-      const errorMessage = 'Failed to update profile';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update profile';
       setError(errorMessage);
       return { error: errorMessage };
     }
@@ -99,7 +151,6 @@ export function useProfile(userId?: string) {
 
     try {
       setError(null);
-
       console.log('Uploading avatar for user:', userId);
 
       // Upload file to Supabase Storage
@@ -113,8 +164,15 @@ export function useProfile(userId?: string) {
 
       if (uploadError) {
         console.error('Error uploading avatar:', uploadError);
-        setError(uploadError.message);
-        return { error: uploadError.message };
+        
+        // If bucket doesn't exist, provide helpful error
+        if (uploadError.message.includes('Bucket not found')) {
+          setError('Storage bucket not configured. Please create a "profiles" bucket in Supabase Storage.');
+          return { error: 'Storage bucket not configured. Please create a "profiles" bucket in Supabase Storage.' };
+        }
+        
+        setError(`Failed to upload avatar: ${uploadError.message}`);
+        return { error: `Failed to upload avatar: ${uploadError.message}` };
       }
 
       // Get public URL
@@ -125,25 +183,16 @@ export function useProfile(userId?: string) {
       console.log('Avatar uploaded, public URL:', publicUrl);
 
       // Update profile with new avatar URL
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', userId)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error updating profile with avatar:', error);
-        setError(error.message);
-        return { error: error.message };
+      const updateResult = await updateProfile({ avatar_url: publicUrl });
+      
+      if (updateResult.error) {
+        return updateResult;
       }
 
-      console.log('Profile updated with avatar:', data);
-      setProfile(data);
       return { data: publicUrl };
     } catch (err) {
       console.error('Avatar upload error:', err);
-      const errorMessage = 'Failed to upload avatar';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload avatar';
       setError(errorMessage);
       return { error: errorMessage };
     }
@@ -155,6 +204,7 @@ export function useProfile(userId?: string) {
     error,
     updateProfile,
     uploadAvatar,
-    refetch: fetchProfile
+    refetch: fetchProfile,
+    createProfile
   };
 }

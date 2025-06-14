@@ -17,7 +17,7 @@ const INTERESTS_OPTIONS = [
 ];
 
 export const ProfileSetupScreen: React.FC<Props> = ({ userId, onComplete, onSkip }) => {
-  const { profile, updateProfile, uploadAvatar } = useProfile(userId);
+  const { profile, updateProfile, uploadAvatar, createProfile } = useProfile(userId);
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,21 +116,38 @@ export const ProfileSetupScreen: React.FC<Props> = ({ userId, onComplete, onSkip
     setIsLoading(true);
     setError(null);
 
-    const updates: Partial<Profile> = {
-      ...formData,
-      is_profile_complete: true
-    };
+    try {
+      console.log('Completing profile setup with data:', formData);
 
-    const result = await updateProfile(updates);
+      const updates: Partial<Profile> = {
+        ...formData,
+        is_profile_complete: true
+      };
 
-    if (result?.error) {
-      setError(result.error);
+      // Try to update first, then create if needed
+      let result = await updateProfile(updates);
+      
+      // If update failed because profile doesn't exist, create it
+      if (result?.error && result.error.includes('not found')) {
+        console.log('Profile not found, creating new profile');
+        result = await createProfile(updates);
+      }
+
+      if (result?.error) {
+        console.error('Profile setup failed:', result.error);
+        setError(result.error);
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('Profile setup completed successfully');
       setIsLoading(false);
-      return;
+      onComplete();
+    } catch (err) {
+      console.error('Profile setup error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to complete profile setup');
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
-    onComplete();
   };
 
   const handleSkip = () => {
