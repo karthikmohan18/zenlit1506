@@ -11,7 +11,7 @@ You need to manually apply the migration to create the profiles table. Follow th
 2. Select your project
 3. Navigate to the "SQL Editor" in the left sidebar
 
-### Step 2: Execute the Migration
+### Step 2: Execute the Profiles Migration
 Copy and paste the following SQL code into the SQL Editor and click "Run":
 
 ```sql
@@ -130,7 +130,20 @@ CREATE TRIGGER update_profiles_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 ```
 
-### Step 3: Create Storage Bucket (Optional)
+### Step 3: Execute the Social Tables Migration
+Run the following SQL to create the additional tables used by the application:
+
+```sql
+/*
+  # Add Social Accounts, Posts, and Messages tables
+*/
+
+-- Copy the contents of `supabase/migrations/20250614173000_expanded_social_schema.sql`
+-- into the SQL editor and run it. This will create the `social_accounts`,
+-- `posts`, and `messages` tables along with row level security policies.
+```
+
+### Step 4: Create Storage Bucket (Optional)
 If you plan to use avatar uploads, also create a storage bucket:
 
 1. Go to "Storage" in the left sidebar
@@ -138,7 +151,7 @@ If you plan to use avatar uploads, also create a storage bucket:
 3. Name it `profiles`
 4. Make it public if you want avatars to be publicly accessible
 
-### Step 4: Configure Authentication Settings
+### Step 5: Configure Authentication Settings
 To fix OTP issues:
 
 1. Go to "Authentication" > "Settings" in your Supabase dashboard
