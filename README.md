@@ -1,11 +1,11 @@
 # Zenlit - Social Media App
 
-A modern social media application built with React, TypeScript, and Tailwind CSS that focuses on local connections and social verification.
+A modern social media application built with Next.js 15, TypeScript, and Supabase that focuses on local connections and social verification.
 
 ## 🚀 Features
 
 ### Core Functionality
-- **User Authentication** - Email/password login with OTP verification
+- **User Authentication** - Email/password login with OTP verification via Supabase
 - **Profile Management** - Customizable profiles with cover photos and bios
 - **Social Media Verification** - OAuth integration for Instagram, Facebook, LinkedIn, Twitter, and Google
 - **Local Discovery** - Radar feature to find nearby users
@@ -26,27 +26,29 @@ A modern social media application built with React, TypeScript, and Tailwind CSS
 - **Dark Theme** - Modern dark UI design
 - **Smooth Animations** - Framer Motion powered transitions
 
--## 🛠 Tech Stack
+## 🛠 Tech Stack
 
 - **Framework**: Next.js 15 with the App Router
 - **Language**: TypeScript
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth with OTP
 - **Styling**: Tailwind CSS with shadcn/ui components
 - **Icons**: Heroicons, Tabler Icons
 - **Animation**: Framer Motion
 - **State Management**: React Hooks
 - **Routing**: Component-based navigation
-- **Authentication**: Mock OAuth flows (ready for backend integration)
 
 ## 📱 Screens
 
 1. **Welcome Screen** - App introduction and onboarding
-2. **Login/Signup** - Authentication with email verification
-3. **Radar Screen** - Discover nearby users
-4. **Feed Screen** - View posts from all users
-5. **Create Post** - Share photos/videos with camera integration
-6. **Messages** - Chat with other users
-7. **Profile Screen** - User profiles with social verification
-8. **Edit Profile** - Update profile information and verify social accounts
+2. **Login/Signup** - Authentication with email OTP verification
+3. **Profile Setup** - Complete profile creation after signup
+4. **Radar Screen** - Discover nearby users
+5. **Feed Screen** - View posts from all users
+6. **Create Post** - Share photos/videos with camera integration
+7. **Messages** - Chat with other users
+8. **Profile Screen** - User profiles with social verification
+9. **Edit Profile** - Update profile information and verify social accounts
 
 ## 🔧 Installation
 
@@ -61,12 +63,35 @@ cd zenlit-social
 npm install
 ```
 
-3. Start the development server:
+3. Set up environment variables:
+```bash
+cp .env.example .env.local
+```
+
+4. Configure your Supabase credentials in `.env.local`:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+5. Set up the database:
+   - Go to your Supabase project dashboard
+   - Navigate to SQL Editor
+   - Run the migration files in order:
+     1. `supabase/migrations/20250613172048_withered_bread.sql`
+     2. `supabase/migrations/20250614173000_expanded_social_schema.sql`
+
+6. Configure Supabase Authentication:
+   - Enable Email provider in Authentication settings
+   - Enable "Allow new users to sign up"
+   - Configure email templates if needed
+
+7. Start the development server:
 ```bash
 npm run dev
 ```
 
-4. Open your browser and navigate to `http://localhost:3000`
+8. Open your browser and navigate to `http://localhost:3000`
 
 ## 🏗 Project Structure
 
@@ -81,79 +106,57 @@ src/
 │   ├── social/        # Social verification components
 │   └── story/         # Stories components
 ├── screens/            # Main application screens
-├── data/              # Mock data and generators
 ├── hooks/             # Custom React hooks
 ├── types/             # TypeScript type definitions
 ├── utils/             # Utility functions
 └── styles/            # CSS and styling
 ```
 
-## 🔐 Social Media Authentication
+## 🔐 Authentication Flow
 
-The app includes a comprehensive social media verification system:
+### New User Registration:
+1. **Email Entry** - User enters email address
+2. **OTP Verification** - 6-digit code sent to email
+3. **Account Setup** - Name, date of birth, password
+4. **Profile Setup** - Bio, interests, avatar, location
+5. **Complete** - User can now access the app
 
-### Supported Platforms
-- Instagram
-- Facebook
-- LinkedIn
-- Twitter/X
-- Google
-
-### Verification Flow
-1. User clicks "Connect" button for a social platform
-2. OAuth flow initiates (currently mocked for demo)
-3. User authorizes the application
-4. Profile URL is retrieved and stored
-5. Verified badge is displayed on user profile
-
-### Implementation Notes
-- OAuth flows are currently mocked for demonstration
-- Ready for backend integration with real OAuth providers
-- Secure token handling and profile verification
-- Error handling for failed authentications
+### Existing User Login:
+1. **Email & Password** - Standard login
+2. **Session Management** - Automatic session handling
+3. **Profile Loading** - User data loaded from Supabase
 
 ## 📊 Database Schema
 
-The app is designed to work with the following database structure:
+### Core Tables:
+- **profiles** - User profile information
+- **social_accounts** - Verified social media accounts
+- **posts** - User-generated content
+- **messages** - Chat functionality
 
-### Users Table
-- Basic user information (name, email, bio, etc.)
-- Profile and cover photo URLs
-- Location data for radar functionality
-
-### Social Accounts Table
-- Verified social media accounts
-- OAuth tokens and profile URLs
-- Verification status and timestamps
-
-### Posts Table
-- User-generated content
-- Media URLs and captions
-- Timestamps and metadata
-
-### Messages Table
-- Chat functionality
-- Sender/receiver relationships
-- Message content and read status
+### Authentication:
+- Handled by Supabase Auth
+- Row Level Security (RLS) enabled
+- Automatic profile creation on signup
 
 ## 🚀 Deployment
 
 ### Build for Production
 ```bash
 npm run build
+npm start
 ```
 
+### Environment Variables for Production
+Make sure to set these in your production environment:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-### Docker
-You can build a production image using the provided `Dockerfile`:
-```bash
-docker build -t zenlit-social .
-docker run -p 3000:3000 zenlit-social
-```
-
-### Progressive Web App
-The project is configured as a PWA using `next-pwa`. When built for
-production, the app can be installed on mobile devices and works offline.
+### Supabase Configuration
+1. Set up production Supabase project
+2. Run database migrations
+3. Configure authentication settings
+4. Set up storage buckets (optional)
 
 ## 🔮 Future Enhancements
 
@@ -178,11 +181,12 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🙏 Acknowledgments
 
-- React team for the amazing framework
+- Next.js team for the amazing framework
+- Supabase for the backend infrastructure
 - Tailwind CSS for the utility-first styling
 - Heroicons and Tabler Icons for beautiful icons
 - All contributors and testers
 
 ---
 
-**Note**: This is a demo application with mocked authentication flows. For production use, implement proper backend services and real OAuth integrations.
+**Note**: This application uses Supabase for authentication and data storage. Make sure to configure your Supabase project properly before deployment.
