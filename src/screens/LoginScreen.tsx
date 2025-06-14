@@ -29,7 +29,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     isVerifying: false,
     isSendingOtp: false,
     countdown: 0,
-    needsEmailConfirmation: false
+    needsEmailConfirmation: false,
+    canResend: true
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -55,7 +56,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       return;
     }
 
-    setEmailVerification(prev => ({ ...prev, isSendingOtp: true }));
+    setEmailVerification(prev => ({ ...prev, isSendingOtp: true, canResend: false }));
     setError(null);
     
     try {
@@ -71,12 +72,35 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
       if (error) {
         console.error('OTP sending error:', error);
+        
+        // Handle rate limiting
+        if (error.message.includes('For security purposes')) {
+          const match = error.message.match(/(\d+)\s+seconds?/);
+          const waitTime = match ? parseInt(match[1]) : 60;
+          setError(`Please wait ${waitTime} seconds before requesting another code.`);
+          
+          // Start countdown for rate limit
+          let remainingTime = waitTime;
+          const rateLimitTimer = setInterval(() => {
+            remainingTime--;
+            if (remainingTime <= 0) {
+              clearInterval(rateLimitTimer);
+              setEmailVerification(prev => ({ ...prev, canResend: true }));
+            } else {
+              setError(`Please wait ${remainingTime} seconds before requesting another code.`);
+            }
+          }, 1000);
+          
+          setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+          return;
+        }
+        
         if (error.message.includes('Signups not allowed')) {
           setError('Email verification is currently disabled. Please contact support.');
         } else {
           setError('Failed to send verification code. Please try again.');
         }
-        setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+        setEmailVerification(prev => ({ ...prev, isSendingOtp: false, canResend: true }));
         return;
       }
       
@@ -85,7 +109,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
         ...prev, 
         otpSent: true, 
         isSendingOtp: false,
-        countdown: 60 
+        countdown: 60,
+        canResend: false
       }));
 
       // Start countdown timer
@@ -93,7 +118,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
         setEmailVerification(prev => {
           if (prev.countdown <= 1) {
             clearInterval(timer);
-            return { ...prev, countdown: 0 };
+            return { ...prev, countdown: 0, canResend: true };
           }
           return { ...prev, countdown: prev.countdown - 1 };
         });
@@ -102,7 +127,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     } catch (err) {
       console.error('OTP sending error:', err);
       setError('Failed to send verification code. Please try again.');
-      setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+      setEmailVerification(prev => ({ ...prev, isSendingOtp: false, canResend: true }));
     }
   };
 
@@ -127,6 +152,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
       if (error) {
         console.error('OTP Verification Error:', error);
+        
         if (error.message.includes('Token has expired') || error.message.includes('otp_expired')) {
           setError('Verification code has expired. Please request a new one.');
           // Reset OTP state so user can request a new one
@@ -134,15 +160,19 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
             ...prev, 
             isVerifying: false,
             otpSent: false,
-            countdown: 0
+            countdown: 0,
+            canResend: true
           }));
           setFormData(prev => ({ ...prev, otp: '' }));
         } else if (error.message.includes('Invalid token') || error.message.includes('invalid')) {
           setError('Invalid verification code. Please check and try again.');
           setEmailVerification(prev => ({ ...prev, isVerifying: false }));
+          // Clear the OTP field for retry
+          setFormData(prev => ({ ...prev, otp: '' }));
         } else {
           setError('Verification failed. Please try again.');
           setEmailVerification(prev => ({ ...prev, isVerifying: false }));
+          setFormData(prev => ({ ...prev, otp: '' }));
         }
         return;
       }
@@ -160,6 +190,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       console.error('OTP Verification Error:', err);
       setError('Verification failed. Please try again.');
       setEmailVerification(prev => ({ ...prev, isVerifying: false }));
+      setFormData(prev => ({ ...prev, otp: '' }));
     }
   };
 
@@ -280,7 +311,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       isVerifying: false,
       isSendingOtp: false,
       countdown: 0,
-      needsEmailConfirmation: false
+      needsEmailConfirmation: false,
+      canResend: true
     });
   };
 
@@ -413,7 +445,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                       <button
                         type="button"
                         onClick={handleSendOtp}
-                        disabled={emailVerification.isSendingOtp || emailVerification.countdown > 0}
+                        disabled={emailVerification.isSendingOtp || !emailVerification.canResend}
                         className="px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 active:scale-95 transition-all disabled:bg-gray-600 disabled:cursor-not-allowed whitespace-nowrap text-sm"
                       >
                         {emailVerification.isSendingOtp ? (
@@ -423,8 +455,10 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                           </div>
                         ) : emailVerification.countdown > 0 ? (
                           `Resend (${emailVerification.countdown}s)`
-                        ) : emailVerification.otpSent ? (
+                        ) : emailVerification.otpSent && emailVerification.canResend ? (
                           'Resend OTP'
+                        ) : !emailVerification.canResend ? (
+                          'Wait...'
                         ) : (
                           'Get OTP'
                         )}
@@ -450,6 +484,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                         className="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center tracking-widest"
                         placeholder="000000"
                         maxLength={6}
+                        disabled={emailVerification.isVerifying}
                       />
                       <button
                         type="button"
