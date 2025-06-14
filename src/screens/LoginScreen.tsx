@@ -30,7 +30,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     isSendingOtp: false,
     countdown: 0,
     needsEmailConfirmation: false,
-    canResend: true
+    canResend: true,
+    rateLimitEnd: null as Date | null
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -43,6 +44,15 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     }));
   };
 
+  const checkRateLimit = () => {
+    if (emailVerification.rateLimitEnd && new Date() < emailVerification.rateLimitEnd) {
+      const remainingSeconds = Math.ceil((emailVerification.rateLimitEnd.getTime() - new Date().getTime()) / 1000);
+      setError(`Please wait ${remainingSeconds} seconds before requesting another code.`);
+      return false;
+    }
+    return true;
+  };
+
   const handleSendOtp = async () => {
     if (!formData.email) {
       setError('Please enter your email address first');
@@ -53,6 +63,11 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setError('Please enter a valid email address');
+      return;
+    }
+
+    // Check rate limit
+    if (!checkRateLimit()) {
       return;
     }
 
@@ -73,25 +88,38 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       if (error) {
         console.error('OTP sending error:', error);
         
-        // Handle rate limiting
+        // Handle rate limiting with better UX
         if (error.message.includes('For security purposes')) {
           const match = error.message.match(/(\d+)\s+seconds?/);
           const waitTime = match ? parseInt(match[1]) : 60;
-          setError(`Please wait ${waitTime} seconds before requesting another code.`);
+          const rateLimitEnd = new Date(Date.now() + waitTime * 1000);
           
-          // Start countdown for rate limit
-          let remainingTime = waitTime;
-          const rateLimitTimer = setInterval(() => {
-            remainingTime--;
-            if (remainingTime <= 0) {
-              clearInterval(rateLimitTimer);
-              setEmailVerification(prev => ({ ...prev, canResend: true }));
+          setEmailVerification(prev => ({ 
+            ...prev, 
+            isSendingOtp: false, 
+            canResend: false,
+            rateLimitEnd 
+          }));
+          
+          setError(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+          
+          // Start countdown timer
+          const timer = setInterval(() => {
+            const now = new Date();
+            if (now >= rateLimitEnd) {
+              clearInterval(timer);
+              setEmailVerification(prev => ({ 
+                ...prev, 
+                canResend: true, 
+                rateLimitEnd: null 
+              }));
+              setError(null);
             } else {
-              setError(`Please wait ${remainingTime} seconds before requesting another code.`);
+              const remaining = Math.ceil((rateLimitEnd.getTime() - now.getTime()) / 1000);
+              setError(`Rate limit exceeded. Please wait ${remaining} seconds before trying again.`);
             }
           }, 1000);
           
-          setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
           return;
         }
         
@@ -312,7 +340,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       isSendingOtp: false,
       countdown: 0,
       needsEmailConfirmation: false,
-      canResend: true
+      canResend: true,
+      rateLimitEnd: null
     });
   };
 

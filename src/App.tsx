@@ -42,8 +42,14 @@ export default function App() {
         if (!profileLoading) {
           if (profileError) {
             console.error('Profile error:', profileError);
-            // Even with profile error, allow user to continue
-            setCurrentScreen('app');
+            // If it's a table not found error, still allow user to continue to setup
+            if (profileError.includes('Database not properly configured') || profileError.includes('does not exist')) {
+              console.log('Database not configured, going to profile setup');
+              setCurrentScreen('profileSetup');
+            } else {
+              // For other errors, still allow user to continue
+              setCurrentScreen('app');
+            }
           } else if (profile) {
             console.log('Profile loaded:', profile);
             if (profile.is_profile_complete) {
