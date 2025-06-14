@@ -62,25 +62,13 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     try {
       console.log('Sending OTP to:', formData.email);
       
-      // For signup, we need to use a different approach
-      // First check if user already exists
-      const { data: existingUser } = await supabase.auth.signInWithPassword({
-        email: formData.email.trim().toLowerCase(),
-        password: 'dummy-password-check'
-      });
-
-      // If no error, user exists - shouldn't be signing up
-      if (existingUser) {
-        setError('An account with this email already exists. Please sign in instead.');
-        setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
-        return;
-      }
-
-      // Send OTP for new user verification
-      const { error } = await supabase.auth.signInWithOtp({
+      // For new users, we'll use a simpler approach
+      // Send OTP directly without checking if user exists
+      const { data, error } = await supabase.auth.signInWithOtp({
         email: formData.email.trim().toLowerCase(),
         options: {
-          shouldCreateUser: false // Don't create user yet, just send OTP
+          shouldCreateUser: true, // Allow creating user if they don't exist
+          emailRedirectTo: undefined // Don't redirect, we'll handle verification in-app
         }
       });
 
@@ -88,7 +76,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
         console.error('OTP sending error:', error);
         
         // Handle rate limiting
-        if (error.message.includes('For security purposes')) {
+        if (error.message.includes('For security purposes') || error.message.includes('rate limit')) {
           const match = error.message.match(/(\d+)\s+seconds?/);
           const waitTime = match ? parseInt(match[1]) : 60;
           setError(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
@@ -101,39 +89,17 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
           return;
         }
         
-        // For signup, if OTP is disabled, we'll handle it differently
-        if (error.message.includes('Signups not allowed') || error.message.includes('otp')) {
-          // Try alternative approach - create user directly and send confirmation
-          console.log('OTP disabled, trying direct signup with email confirmation');
-          
-          const { data, error: signupError } = await supabase.auth.signUp({
-            email: formData.email.trim().toLowerCase(),
-            password: 'temp-password-' + Math.random().toString(36), // Temporary password
-            options: {
-              emailRedirectTo: window.location.origin,
-              data: {
-                temp_signup: true
-              }
-            }
-          });
-
-          if (signupError) {
-            if (signupError.message.includes('User already registered')) {
-              setError('An account with this email already exists. Please sign in instead.');
-            } else {
-              setError('Email verification is currently disabled. Please contact support.');
-            }
-            setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
-            return;
-          }
-
-          // If signup successful, mark as needing email confirmation
-          setEmailVerification(prev => ({ 
-            ...prev, 
-            otpSent: true,
-            isSendingOtp: false,
-            needsEmailConfirmation: true
-          }));
+        // Handle signup disabled
+        if (error.message.includes('Signups not allowed') || error.message.includes('signup is disabled')) {
+          setError('New user registration is currently disabled. Please contact support or try signing in if you already have an account.');
+          setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+          return;
+        }
+        
+        // Handle email already registered
+        if (error.message.includes('already registered')) {
+          setError('An account with this email already exists. Please sign in instead.');
+          setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
           return;
         }
         
@@ -163,44 +129,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
     } catch (err) {
       console.error('OTP sending error:', err);
-      
-      // Check if it's because user doesn't exist (which is expected for new signups)
-      if (err instanceof Error && err.message.includes('Invalid login credentials')) {
-        // This is expected for new users, try to send OTP anyway
-        try {
-          const { error: otpError } = await supabase.auth.signInWithOtp({
-            email: formData.email.trim().toLowerCase()
-          });
-          
-          if (otpError) {
-            setError('Failed to send verification code. Please try again.');
-          } else {
-            console.log('OTP sent successfully for new user');
-            setEmailVerification(prev => ({ 
-              ...prev, 
-              otpSent: true, 
-              isSendingOtp: false,
-              countdown: 60 
-            }));
-
-            // Start countdown timer
-            const timer = setInterval(() => {
-              setEmailVerification(prev => {
-                if (prev.countdown <= 1) {
-                  clearInterval(timer);
-                  return { ...prev, countdown: 0 };
-                }
-                return { ...prev, countdown: prev.countdown - 1 };
-              });
-            }, 1000);
-          }
-        } catch (otpErr) {
-          setError('Failed to send verification code. Please try again.');
-        }
-      } else {
-        setError('Failed to send verification code. Please try again.');
-      }
-      
+      setError('Failed to send verification code. Please try again.');
       setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
     }
   };
@@ -325,43 +254,25 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       } else {
         console.log('Attempting signup for:', formData.email);
         
-        // For signup, create user with email and password
-        const { data, error } = await supabase.auth.signUp({
-          email: formData.email.trim().toLowerCase(),
+        // For signup, the user was already created during OTP verification
+        // We just need to update their password and metadata
+        const { data, error } = await supabase.auth.updateUser({
           password: formData.password,
-          options: {
-            data: {
-              first_name: formData.firstName.trim(),
-              last_name: formData.lastName.trim(),
-              date_of_birth: formData.dateOfBirth,
-            }
+          data: {
+            first_name: formData.firstName.trim(),
+            last_name: formData.lastName.trim(),
+            date_of_birth: formData.dateOfBirth,
           }
         });
 
         if (error) {
-          console.error('Signup error:', error);
-          if (error.message.includes('User already registered')) {
-            setError('An account with this email already exists. Please sign in instead.');
-          } else if (error.message.includes('Password should be at least')) {
-            setError('Password must be at least 6 characters long.');
-          } else if (error.message.includes('Signup is disabled')) {
-            setError('Account creation is currently disabled. Please contact support.');
-          } else {
-            setError(error.message);
-          }
+          console.error('Signup completion error:', error);
+          setError('Failed to complete account setup. Please try again.');
           setIsLoading(false);
           return;
         }
 
-        console.log('Signup successful:', data.user?.id);
-        
-        // Check if email confirmation is required
-        if (data.user && !data.session) {
-          setError('Please check your email and click the confirmation link to complete your registration.');
-          setIsLoading(false);
-          return;
-        }
-        
+        console.log('Signup completed successfully:', data.user?.id);
         // Don't call onLogin() here - let the session change handle it
       }
     } catch (err) {
@@ -451,7 +362,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Name fields for signup - side by side */}
-                {!isLogin && (
+                {!isLogin && emailVerification.otpVerified && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -483,7 +394,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                 )}
 
                 {/* Date of Birth for signup */}
-                {!isLogin && (
+                {!isLogin && emailVerification.otpVerified && (
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Date of Birth
