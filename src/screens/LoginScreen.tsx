@@ -30,7 +30,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     isVerifying: false,
     isSendingOtp: false,
     countdown: 0,
-    needsEmailConfirmation: false
+    needsEmailConfirmation: false,
+    otpDisabled: false
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -60,13 +61,13 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     setError(null);
     
     try {
-      console.log('Sending OTP to:', formData.email);
+      console.log('Attempting to send OTP to:', formData.email);
       
-      // Use Supabase OTP for email verification - but allow user creation
+      // Try to send OTP for email verification
       const { error } = await supabase.auth.signInWithOtp({
         email: formData.email.trim().toLowerCase(),
         options: {
-          shouldCreateUser: true // Allow creating user during OTP flow
+          shouldCreateUser: false // Don't create user yet, just verify email
         }
       });
 
@@ -80,29 +81,29 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
           setError(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
           setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
           
-          // Auto-retry after wait time
+          // Auto-clear error after wait time
           setTimeout(() => {
             setError(null);
-            setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
           }, waitTime * 1000);
           return;
         }
         
-        if (error.message.includes('Signups not allowed')) {
-          setError('Email verification is currently disabled. You can still create an account without email verification.');
-          setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
-          // Allow user to proceed without OTP
+        // Handle OTP disabled or signups not allowed
+        if (error.message.includes('Signups not allowed') || error.message.includes('otp')) {
+          console.log('OTP is disabled, allowing signup without email verification');
           setEmailVerification(prev => ({ 
             ...prev, 
             otpVerified: true, 
-            isSendingOtp: false 
+            isSendingOtp: false,
+            otpDisabled: true
           }));
+          setError(null);
           return;
         } else {
           setError('Failed to send verification code. Please try again.');
+          setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+          return;
         }
-        setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
-        return;
       }
       
       console.log('OTP sent successfully');
@@ -315,7 +316,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       isVerifying: false,
       isSendingOtp: false,
       countdown: 0,
-      needsEmailConfirmation: false
+      needsEmailConfirmation: false,
+      otpDisabled: false
     });
   };
 
@@ -469,7 +471,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                 </div>
 
                 {/* OTP Input (only show for signup after OTP is sent) */}
-                {!isLogin && emailVerification.otpSent && !emailVerification.otpVerified && (
+                {!isLogin && emailVerification.otpSent && !emailVerification.otpVerified && !emailVerification.otpDisabled && (
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Enter OTP
@@ -514,7 +516,10 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                     <div className="flex items-center gap-2">
                       <CheckCircleIcon className="w-5 h-5 text-green-500" />
                       <span className="text-green-400 text-sm font-medium">
-                        Email verified successfully!
+                        {emailVerification.otpDisabled 
+                          ? 'Email verification skipped (OTP disabled)'
+                          : 'Email verified successfully!'
+                        }
                       </span>
                     </div>
                   </div>
