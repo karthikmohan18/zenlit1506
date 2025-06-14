@@ -30,8 +30,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     isVerifying: false,
     isSendingOtp: false,
     countdown: 0,
-    needsEmailConfirmation: false,
-    otpDisabled: false
+    needsEmailConfirmation: false
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -61,13 +60,27 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     setError(null);
     
     try {
-      console.log('Attempting to send OTP to:', formData.email);
+      console.log('Sending OTP to:', formData.email);
       
-      // Try to send OTP for email verification
+      // For signup, we need to use a different approach
+      // First check if user already exists
+      const { data: existingUser } = await supabase.auth.signInWithPassword({
+        email: formData.email.trim().toLowerCase(),
+        password: 'dummy-password-check'
+      });
+
+      // If no error, user exists - shouldn't be signing up
+      if (existingUser) {
+        setError('An account with this email already exists. Please sign in instead.');
+        setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+        return;
+      }
+
+      // Send OTP for new user verification
       const { error } = await supabase.auth.signInWithOtp({
         email: formData.email.trim().toLowerCase(),
         options: {
-          shouldCreateUser: false // Don't create user yet, just verify email
+          shouldCreateUser: false // Don't create user yet, just send OTP
         }
       });
 
@@ -88,22 +101,45 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
           return;
         }
         
-        // Handle OTP disabled or signups not allowed
+        // For signup, if OTP is disabled, we'll handle it differently
         if (error.message.includes('Signups not allowed') || error.message.includes('otp')) {
-          console.log('OTP is disabled, allowing signup without email verification');
+          // Try alternative approach - create user directly and send confirmation
+          console.log('OTP disabled, trying direct signup with email confirmation');
+          
+          const { data, error: signupError } = await supabase.auth.signUp({
+            email: formData.email.trim().toLowerCase(),
+            password: 'temp-password-' + Math.random().toString(36), // Temporary password
+            options: {
+              emailRedirectTo: window.location.origin,
+              data: {
+                temp_signup: true
+              }
+            }
+          });
+
+          if (signupError) {
+            if (signupError.message.includes('User already registered')) {
+              setError('An account with this email already exists. Please sign in instead.');
+            } else {
+              setError('Email verification is currently disabled. Please contact support.');
+            }
+            setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+            return;
+          }
+
+          // If signup successful, mark as needing email confirmation
           setEmailVerification(prev => ({ 
             ...prev, 
-            otpVerified: true, 
+            otpSent: true,
             isSendingOtp: false,
-            otpDisabled: true
+            needsEmailConfirmation: true
           }));
-          setError(null);
-          return;
-        } else {
-          setError('Failed to send verification code. Please try again.');
-          setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
           return;
         }
+        
+        setError('Failed to send verification code. Please try again.');
+        setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
+        return;
       }
       
       console.log('OTP sent successfully');
@@ -127,7 +163,44 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
     } catch (err) {
       console.error('OTP sending error:', err);
-      setError('Failed to send verification code. Please try again.');
+      
+      // Check if it's because user doesn't exist (which is expected for new signups)
+      if (err instanceof Error && err.message.includes('Invalid login credentials')) {
+        // This is expected for new users, try to send OTP anyway
+        try {
+          const { error: otpError } = await supabase.auth.signInWithOtp({
+            email: formData.email.trim().toLowerCase()
+          });
+          
+          if (otpError) {
+            setError('Failed to send verification code. Please try again.');
+          } else {
+            console.log('OTP sent successfully for new user');
+            setEmailVerification(prev => ({ 
+              ...prev, 
+              otpSent: true, 
+              isSendingOtp: false,
+              countdown: 60 
+            }));
+
+            // Start countdown timer
+            const timer = setInterval(() => {
+              setEmailVerification(prev => {
+                if (prev.countdown <= 1) {
+                  clearInterval(timer);
+                  return { ...prev, countdown: 0 };
+                }
+                return { ...prev, countdown: prev.countdown - 1 };
+              });
+            }, 1000);
+          }
+        } catch (otpErr) {
+          setError('Failed to send verification code. Please try again.');
+        }
+      } else {
+        setError('Failed to send verification code. Please try again.');
+      }
+      
       setEmailVerification(prev => ({ ...prev, isSendingOtp: false }));
     }
   };
@@ -193,7 +266,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
     e.preventDefault();
     setError(null);
 
-    // For signup, require email verification (unless OTP is disabled)
+    // For signup, require email verification
     if (!isLogin && !emailVerification.otpVerified) {
       setError('Please verify your email address first');
       return;
@@ -316,8 +389,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       isVerifying: false,
       isSendingOtp: false,
       countdown: 0,
-      needsEmailConfirmation: false,
-      otpDisabled: false
+      needsEmailConfirmation: false
     });
   };
 
@@ -471,7 +543,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                 </div>
 
                 {/* OTP Input (only show for signup after OTP is sent) */}
-                {!isLogin && emailVerification.otpSent && !emailVerification.otpVerified && !emailVerification.otpDisabled && (
+                {!isLogin && emailVerification.otpSent && !emailVerification.otpVerified && (
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Enter OTP
@@ -516,10 +588,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                     <div className="flex items-center gap-2">
                       <CheckCircleIcon className="w-5 h-5 text-green-500" />
                       <span className="text-green-400 text-sm font-medium">
-                        {emailVerification.otpDisabled 
-                          ? 'Email verification skipped (OTP disabled)'
-                          : 'Email verified successfully!'
-                        }
+                        Email verified successfully!
                       </span>
                     </div>
                   </div>
